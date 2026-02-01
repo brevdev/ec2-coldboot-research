@@ -1,0 +1,11 @@
+# AMI IDs from baking scripts
+scripts/.ami-*
+
+# Benchmark results
+bench/results-*.csv
+
+# OS
+.DS_Store
+
+# Local env
+.env
