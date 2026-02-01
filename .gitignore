@@ -1,6 +1,7 @@
-# Ralph (not using for this spike)
-.ralph/
-.ralphrc
+# Ralph session files
+.exit_signals
+.ralph_session
+progress.json
 
 # AMI IDs from baking scripts
 scripts/.ami-*
@@ -13,3 +14,5 @@ bench/results-*.csv
 
 # Local env
 .env
+.ralph/
+.ralphrc
