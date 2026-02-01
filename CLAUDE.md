@@ -51,6 +51,7 @@ Target: Get T4-T0 under 10 seconds (baseline is 30-60s).
 | `minimal-ami` | Stripped AL2023, no cloud-init | 28.8s (+12% slower!) |
 | `warm-pool` | Running instance + SSH key inject | **1.9s (-92%)** |
 | `warm-pool-eic` | Running instance + EC2 Instance Connect | **3.9s (-85%)** |
+| `warm-pool-realistic` | EIC + EC2 tag-based pool mgmt | 12.8s (-50%) |
 
 ## Sweep Results
 
