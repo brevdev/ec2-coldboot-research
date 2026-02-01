@@ -33,7 +33,7 @@ wait_for_ssh() {
 
     # Try SSH auth
     if ssh -i "$key" -o ConnectTimeout=2 -o BatchMode=yes -o StrictHostKeyChecking=no \
-       ec2-user@"$ip" "echo ok" 2>/dev/null; then
+       ec2-user@"$ip" "true" >/dev/null 2>&1; then
       local end=$(now_ms)
       echo "  SSH auth: $((end - start))ms" >&2
       echo "$end"
