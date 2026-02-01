@@ -1,64 +1,57 @@
 # Documentation
 
+Bash spike to measure EC2 deployment speed. Goal: learn where time goes, apply to brownfield backend.
+
+## Quick Start
+
+```bash
+# 1. Setup AWS resources
+./scripts/setup-security-group.sh
+./scripts/setup-keypair.sh
+
+# 2. Run baseline benchmark
+./bench/cold.sh ~/.ssh/instant-env-admin.pem
+
+# 3. Cleanup when done
+./scripts/cleanup-all.sh
+```
+
 ## Contents
 
-- [AWS Setup](aws-setup.md) - One-time AWS infrastructure setup using CLI
-- [Techniques](techniques.md) - Deep dive on each optimization technique
-- [Benchmarking](benchmarking.md) - How to run and interpret benchmarks
-
-## Architecture
-
-```
-┌─────────────────┐
-│  HTTP API       │
-│  POST /instance │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Launcher       │
-│  (technique)    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐      ┌─────────────────┐
-│  EC2 API        │ ──── │  Metrics        │
-│  RunInstances   │      │  Collector      │
-└────────┬────────┘      └─────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│  SSH Probe      │
-│  (auth check)   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Response       │
-│  {ip, timings}  │
-└─────────────────┘
-```
+- [AWS Setup](aws-setup.md) - One-time infrastructure setup
 
 ## Timing Phases
 
 ```
-Request ──┬── t0 (request received)
-          │
-          ├── EC2 API call
-          │
-          ├── t1 (instance ID returned)
-          │
-          ├── Wait for "running" state
-          │
-          ├── t2 (state = running)
-          │
-          ├── TCP probe port 22
-          │
-          ├── t3 (TCP accepts)
-          │
-          ├── SSH auth handshake
-          │
-          └── t4 (auth success)
+T0  Script starts
+ │
+ ├─ aws ec2 run-instances
+ │
+T1  Instance ID returned
+ │
+ ├─ aws ec2 wait instance-running
+ │
+T2  State = "running"
+ │
+ ├─ nc -z (TCP probe)
+ │
+T3  TCP port 22 open
+ │
+ ├─ ssh (auth handshake)
+ │
+T4  SSH auth success
 
-Total time = t4 - t0
+Total = T4 - T0
 ```
+
+## Techniques
+
+| Script | Description | Status |
+|--------|-------------|--------|
+| `bench/cold.sh` | Baseline with cloud-init | Ready |
+| `bench/minimal-ami.sh` | Stripped AMI, no cloud-init | TODO |
+| `bench/custom-init.sh` | Go/bash init binary | TODO |
+
+## Instance Type
+
+Fixed to **m7i.large** for consistent benchmarking.

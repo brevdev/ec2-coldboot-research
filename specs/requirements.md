@@ -2,111 +2,57 @@
 
 ## Overview
 
-A benchmarking tool and service to measure EC2 instance deployment speed. The goal is to find the fastest path from "user provides SSH public key" to "user can SSH into instance."
+Bash spike to measure EC2 instance deployment speed. Goal: learn where the 30-60 seconds goes, then apply learnings to brownfield backend.
 
 ## Hypothesis
 
-With aggressive optimization (minimal AMI, pre-allocated networking, bypassing cloud-init), we can achieve 5-10 second deployment times. The baseline cold deploy is typically 30-60 seconds.
+With aggressive optimization (minimal AMI, bypassing cloud-init), we can achieve 5-10 second deployment times.
 
-## Core Requirements
+## What We're Measuring
 
-### Functional
+```
+T0 → T1: RunInstances API latency
+T1 → T2: Pending → Running (hypervisor boot)
+T2 → T3: Running → TCP 22 open (OS + sshd startup)
+T3 → T4: TCP → SSH auth (sshd ready + key accepted)
+```
 
-1. **Benchmark CLI**: Run controlled benchmarks of different launch techniques
-   - Specify technique (cold, minimal-ami, prealloc-eni, warm-stopped, custom-init)
-   - Specify instance type (m7i.large, m7g.large, etc.)
-   - Specify iteration count
-   - Output timing breakdown
+## Techniques (Simplified)
 
-2. **HTTP API Service**: On-demand instance provisioning
-   - Accept SSH public key
-   - Select technique (or auto-select fastest available)
-   - Return IP, port, and timing metrics
-   - Clean up instances after TTL
-
-3. **Timing Accuracy**: Millisecond precision for all phases
-   - `t0`: Request received
-   - `t1`: EC2 API call returns (instance ID obtained)
-   - `t2`: Instance state = "running"
-   - `t3`: TCP port 22 accepts connection
-   - `t4`: SSH authentication succeeds
-
-4. **Multi-architecture**: Support both x86_64 (m7i) and arm64 (m7g)
-
-### Non-Functional
-
-1. **Cleanup**: All benchmark instances must be terminated after runs
-2. **Tagging**: All resources tagged with `Project=instant-env`
-3. **Cost awareness**: Default to spot instances for benchmarks
-4. **Idempotent setup**: Scripts can be re-run safely
-
-## Techniques to Benchmark
-
-### Control: Cold Deploy
-- Standard RunInstances with Amazon Linux 2023
-- Default VPC, auto-assign public IP
+### 1. Cold (Baseline)
+- Amazon Linux 2023 default AMI
 - cloud-init injects SSH key
 - Expected: 30-60 seconds
 
-### Technique 1: Minimal AMI
-- Strip Amazon Linux 2023 to bare minimum
-- Remove: cloud-init, ssm-agent, unnecessary packages
-- Bake in a minimal init that just starts sshd
-- Expected improvement: 10-20 seconds saved
+### 2. Minimal AMI
+- Strip AL2023: remove cloud-init, ssm-agent, extras
+- Keep: kernel, sshd, networking
+- Expected: 15-25 seconds
 
-### Technique 2: Pre-allocated ENI
-- Create ENI in advance with public IP
-- Attach at instance launch
-- Eliminates network setup time
-- Expected improvement: 2-5 seconds saved
+### 3. Custom Init
+- Bake init script/binary into AMI
+- Fetches key from userdata, writes authorized_keys, starts sshd
+- No cloud-init, minimal systemd
+- Expected: 5-15 seconds (target)
 
-### Technique 3: Warm Stopped Pool
-- Pre-create instances in "stopped" state
-- StartInstances is faster than RunInstances
-- Key injection via userdata or instance metadata
-- Expected improvement: 10-15 seconds saved
+## Constraints
 
-### Technique 4: Custom Init Binary
-- Bake a Go binary into AMI that:
-  - Fetches pubkey from instance metadata or parameter store
-  - Writes to authorized_keys
-  - Starts sshd
-- No systemd, no cloud-init, no shell scripts
-- Expected: Fastest cold-start possible
-
-### Technique 5: Warm Hibernated (Research)
-- Hibernate instance with memory state preserved
-- Resume should be near-instant
-- Requires EBS-backed, specific instance types
-- Research: Does this work for our use case?
-
-## Out of Scope (V1)
-
-- Windows instances
-- GPU instances
-- Container-based alternatives (ECS, Fargate)
-- Lambda-based SSH proxying
-- Multi-region deployment
-- Production hardening (this is a benchmarking tool)
+- **Instance type**: m7i.large (fixed)
+- **No spot**: Keep it simple
+- **No HTTP API**: CLI benchmarks only
+- **Single region**: Default from AWS CLI
 
 ## Success Criteria
 
-1. Cold deploy baseline established with repeatable measurements
-2. At least one technique achieves <15 second deploy time
-3. Timing breakdown identifies where time is spent
-4. Clear recommendation for production optimization path
+1. Baseline timing documented with breakdown
+2. Identify where time actually goes
+3. At least one technique under 15 seconds
+4. Clear learnings for production backend
 
-## AWS Resources Required
+## Out of Scope
 
-- VPC with public subnet (can use default)
-- Security group allowing SSH (port 22)
-- IAM role for EC2 (SSM, if needed)
-- S3 bucket (optional, for AMI baking artifacts)
-- AMIs: Amazon Linux 2023 (baseline), custom minimal AMIs
-
-## Open Questions
-
-1. Does IMDSv2 hop limit affect boot time?
-2. Can we pre-warm the Nitro hypervisor?
-3. What's the actual breakdown of cloud-init execution time?
-4. Is there a difference between regions for boot time?
+- Multi-architecture (arm64)
+- Warm pools / stopped instances
+- Pre-allocated ENI/EIP
+- HTTP API service
+- Production hardening

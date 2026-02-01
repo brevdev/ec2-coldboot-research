@@ -1,3 +1,7 @@
+# Ralph (not using for this spike)
+.ralph/
+.ralphrc
+
 # AMI IDs from baking scripts
 scripts/.ami-*
 
